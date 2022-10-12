@@ -31,8 +31,9 @@
 ```bash
 export MODEL_DIR=base
 rm -rf $MODEL_DIR
-if 
-wget https://storage.googleapis.com/tfhub-modules/google/albert_base/2.tar.gz
+if [[ ! -f 2.tar.gz ]]; then
+  wget https://storage.googleapis.com/tfhub-modules/google/albert_base/2.tar.gz
+fi
 mkdir ${MODEL_DIR}
 tar -xvzf 2.tar.gz --directory=${MODEL_DIR}
 # Converting weights to TF 2.0

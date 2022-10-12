@@ -51,6 +51,7 @@ Train a new sentence piece tokenizer using [sentencepiece](https://github.com/go
 
 ### Setup Model for fine-tuning
 
+
 ```bash
 export MODEL_DIR=base
 wget https://storage.googleapis.com/tfhub-modules/google/albert_base/2.tar.gz

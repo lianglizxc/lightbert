@@ -26,7 +26,6 @@ import re
 import unicodedata
 import six
 from six.moves import range
-import tensorflow as tf
 import sentencepiece as spm
 
 from absl import logging
@@ -199,9 +198,9 @@ def printable_text(text):
 def load_vocab(vocab_file):
   """Loads a vocabulary file into a dictionary."""
   vocab = collections.OrderedDict()
-  with tf.io.gfile.GFile(vocab_file, "r") as reader:
-    while True:
-      token = convert_to_unicode(reader.readline())
+  with open(vocab_file, "r") as file:
+    for line in file:
+      token = convert_to_unicode(line)
       if not token:
         break
       token = token.strip().split()[0]

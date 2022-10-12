@@ -1,5 +1,7 @@
 .idea
 __pycache__/
 processed_data
+finance_data
+.ipynb_checkpoints
 exclude
 base

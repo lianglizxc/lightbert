@@ -24,7 +24,8 @@ import math
 import six
 import tensorflow as tf
 import sys
-sys.path.append('G:\pythonProject\lightbert')
+import os
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from albertlib.utils import tf_utils
 
 class AlbertConfig(object):
