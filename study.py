@@ -3,9 +3,9 @@ from albertlib import albert_model, tokenization
 from albertlib.create_pretraining_data import create_training_instances, write_instance_to_example_files
 from albertlib.albert import AlbertConfig
 from albertlib.input_pipeline import create_pretrain_dataset
-import random
 from absl import logging, flags
 import tensorflow as tf
+import random
 
 train_meta_data = {
     "max_seq_length": 20,
@@ -86,4 +86,4 @@ def read_tf_record():
 
 
 if __name__ == '__main__':
-    read_tf_record()
+    pass
