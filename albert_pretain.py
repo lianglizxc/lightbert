@@ -3,8 +3,9 @@ from albertlib import albert_model
 from albertlib.albert import AlbertConfig
 from dataset import make_pretrain_dataset
 from albertlib.optimization import LAMB, AdamWeightDecay, WarmUp
-import json
+from absl import flags
 import os
+import json
 
 def print_attributes(inputs, lm_output):
     im_ids = inputs['masked_lm_ids']
@@ -26,11 +27,12 @@ class PretrainSolver():
         self.epoch = epoch
         self.model_dir = output_dir
         self.loss = tf.keras.losses.CategoricalCrossentropy(from_logits=True)
-        self.optimizer = self.get_optimizer(optimizer_config, int(steps_per_epoch * epoch))
+        self.total_step = int(steps_per_epoch * epoch)
+        self.optimizer = self.get_optimizer(optimizer_config, self.total_step)
         self.train_acc_metric = tf.keras.metrics.Accuracy()
         self.val_acc_metric = tf.keras.metrics.Accuracy()
         self.total_loss = tf.keras.metrics.Mean()
-        self.save_per_epoch = 100
+        self.save_per_epoch = 1
         self.train_metrics = []
         self.eval_metrics = []
 
@@ -78,10 +80,14 @@ class PretrainSolver():
                 self.write_summery(num_train_step)
                 num_train_step += 1
 
-            training_status = self.get_train_metrics(i)
-            print(training_status)
+                if num_train_step % 100 == 0:
+                    training_status = self.get_train_metrics(num_train_step)
+                    print(training_status)
 
-            if i != 0 and (i % self.save_per_epoch) == 0:
+                if num_train_step % 5000 == 0:
+                    self.save_check_points(f'ctl_step_{num_train_step}.ckpt')
+
+            if i % self.save_per_epoch == 0:
                 self.save_check_points(f'ctl_epoch_{i}.ckpt')
             if testSet:
                 self.eval(testSet)
@@ -120,7 +126,7 @@ class PretrainSolver():
 
     def get_train_metrics(self, epoch):
         train_loss = self.total_loss.result().numpy()
-        training_status = 'Train epoch: %d  / loss = %s' % (epoch, train_loss)
+        training_status = 'Train step: %d/%d  / loss = %s' % (epoch, self.total_step, train_loss)
         for metric in self.train_metrics + self.model.metrics:
             metric_value = metric.result().numpy()
             training_status += '  %s = %f' % (metric.name, metric_value)
@@ -148,7 +154,6 @@ class PretrainSolver():
 
 
 def get_train_config():
-    from absl import flags
     ## Required parameters
     flags.DEFINE_string(
         "albert_config_file", None,
