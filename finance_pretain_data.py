@@ -8,32 +8,19 @@ import random
 
 
 def save_corpus_vocab():
-    FLAGS = flags.FLAGS
-    FLAGS.input_file = 'finance_data/data.txt'
-    FLAGS.max_seq_length = 50
-    FLAGS.max_predictions_per_seq = 10
-    FLAGS.ngram = 0
-    FLAGS.dupe_factor = 0
-    FLAGS.mark_as_parsed()
 
     stop_words = finance_token.read_stop_words()
     tokenizer = finance_token.JiebaTokenizer(stop_words, [punctuation, punctuation_zh])
 
-    input_files = []
-    for input_pattern in FLAGS.input_file.split(","):
-        input_files.extend(glob.glob(input_pattern))
-
-    logging.info("*** Reading from input files ***")
-    for input_file in input_files:
-        logging.info("  %s", input_file)
-
-    rng = random.Random(FLAGS.random_seed)
-    create_training_instances(
-        input_files, tokenizer, FLAGS.max_seq_length, FLAGS.dupe_factor,
-        FLAGS.short_seq_prob, FLAGS.masked_lm_prob, FLAGS.max_predictions_per_seq,
-        rng)
+    with open('finance_data/data.txt','r') as file:
+        for line in file:
+            line = line.strip()
+            if len(line) == 0:
+                continue
+            tokenizer.update_vocab(line)
 
     tokenizer.save_vocab('finance_data/vocab')
+    tokenizer.save_count('finance_data/vocab_count')
 
 
 def get_pretrain_finance_data():
@@ -42,14 +29,16 @@ def get_pretrain_finance_data():
     FLAGS.meta_data_file_path = 'processed_data/train_meta_data'
     FLAGS.input_file = 'finance_data/data.txt'
     FLAGS.max_seq_length = 50
-    FLAGS.max_predictions_per_seq = 10
+    FLAGS.max_predictions_per_seq = 20
+    FLAGS.masked_lm_prob = 0.15
     FLAGS.output_file = 'processed_data/train.tf_record'
-    FLAGS.ngram = 0
-    FLAGS.dupe_factor = 1
+    FLAGS.ngram = 1
+    FLAGS.dupe_factor = 50
     FLAGS.mark_as_parsed()
 
     stop_words = finance_token.read_stop_words()
-    tokenizer = finance_token.JiebaTokenizer(stop_words, [punctuation, punctuation_zh])
+    tokenizer = finance_token.JiebaTokenizer(stop_words, [punctuation, punctuation_zh], vocab = 'finance_data/vocab')
+    tokenizer.truncate_vocab('finance_data/vocab_count')
 
     input_files = []
     for input_pattern in FLAGS.input_file.split(","):
@@ -76,4 +65,4 @@ def get_pretrain_finance_data():
                                     FLAGS.max_predictions_per_seq, output_files)
 
 if __name__ == '__main__':
-    save_corpus_vocab()
+    get_pretrain_finance_data()

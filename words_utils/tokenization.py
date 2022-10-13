@@ -5,44 +5,66 @@ class JiebaTokenizer():
     def __init__(self, stop_words, punctuations, vocab=None):
         self.stop_words = stop_words
         self.punctuation = set()
+        self.init_vocab = {'<pad>': 0,
+                          '<unk>': 1,
+                          '[CLS]': 2,
+                          '[SEP]': 3,
+                          '[MASK]': 4}
         for punctuation in punctuations:
             self.punctuation.update(set(punctuation))
 
         if isinstance(vocab, str):
             self.vocab = self.load_vocab(vocab)
         else:
-            self.vocab = self.init_vocab(vocab)
+            self.vocab = self.build_vocab(vocab)
 
         self.id_to_vocab = self.make_id_vocab()
+        self.count = {}
 
-    def init_vocab(self, vocab):
-        init_vocab = {'<pad>': 0,
-                      '<unk>': 1,
-                      'CLS': 2,
-                      'SEP': 3,
-                      'MASK': 4}
-        init_vocab = collections.OrderedDict(init_vocab)
-        if vocab is not None:
-            for word in vocab:
-                init_vocab[word] = len(init_vocab)
-        return init_vocab
+    def build_vocab(self, add_vocab):
+        vocab = collections.OrderedDict(self.init_vocab)
+        if add_vocab is not None:
+            for word in add_vocab:
+                if word not in vocab:
+                    vocab[word] = len(vocab)
+        return vocab
 
     def tokenize(self, text):
         tokens = []
         for token in jieba.cut(text, cut_all=False):
-            if token in self.stop_words:
-                continue
-            if token in self.punctuation:
-                continue
-            if token == ' ' or token == '\n' or token[0].isnumeric():
-                continue
-            if len(token) == 1 and token[0].isalpha():
-                continue
-            word = token.lower()
-            tokens.append(word)
+            word = self.preprocess_token(token)
+            if word is None: continue
+            if word in self.vocab:
+                tokens.append(word)
+        return tokens
+
+    def update_vocab(self, text):
+        for token in jieba.cut(text, cut_all=False):
+            word = self.preprocess_token(token)
+            if word is None: continue
             if word not in self.vocab:
                 self.vocab[word] = len(self.vocab)
-        return tokens
+            if word not in self.count:
+                self.count[word] = 0
+            self.count[word] += 1
+
+    def preprocess_token(self, token):
+        if token in self.stop_words:
+            return None
+        if token in self.punctuation:
+            return None
+        if token == ' ' or token == '\n' or token[0].isnumeric():
+            return None
+        if len(token) == 1 and token[0].isalpha():
+            return None
+        return token.lower()
+
+    def save_count(self, path):
+        items = list(self.count.items())
+        items = sorted(items, key=lambda x:x[1], reverse=True)
+        with open(path, 'w', encoding='UTF-8') as file:
+            for w, count in items:
+                file.write(w + '->' + str(count) + '\n')
 
     def save_vocab(self, path):
         with open(path, 'w', encoding='UTF-8') as file:
@@ -50,13 +72,32 @@ class JiebaTokenizer():
                 file.write(w + '->' + str(id) + '\n')
 
     def load_vocab(self, path):
-        init_vocab = collections.OrderedDict()
+        vocab = collections.OrderedDict()
         with open(path, 'r',encoding='UTF-8') as file:
             for line in file:
                 line = line.strip().split('->')
                 assert len(line) == 2
-                init_vocab[line[0]] = int(line[1])
-        return init_vocab
+                vocab[line[0]] = int(line[1])
+        return vocab
+
+    def truncate_vocab(self, count_path, max_number=50000):
+        vocab_count = {}
+        location = 0
+        with open(count_path, 'r') as file:
+            for line in file:
+                word, _ = line.strip().split('->')
+                vocab_count[word] = location
+                location += 1
+                if len(vocab_count) == max_number - len(self.init_vocab):
+                    break
+
+        vocab = self.init_vocab.copy()
+        for w in self.vocab:
+            if w in vocab_count:
+                vocab[w] = len(self.init_vocab) + vocab_count[w]
+
+        self.vocab = collections.OrderedDict(sorted(vocab.items(), key=lambda x: x[1]))
+        assert len(self.vocab) == max_number
 
     def convert_tokens_to_ids(self, tokens):
         return convert_by_vocab(self.vocab, tokens)
