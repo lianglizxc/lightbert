@@ -250,14 +250,6 @@ def run_customized_training_loop(
       """
       return strategy.run(_replicated_step, args=(next(iterator),))
 
-    def print_attributes(inputs, lm_output):
-      im_ids = inputs['masked_lm_ids']
-      batch_size, seq_length = tf.shape(im_ids)[0], tf.shape(im_ids)[1]
-      lm_output = tf.reshape(lm_output, [batch_size, seq_length, -1])
-      lm_output = tf.argmax(lm_output, -1)
-      print(im_ids)
-      print(lm_output)
-
     def test_step(iterator):
       """Calculates evaluation metrics on distributed devices."""
 

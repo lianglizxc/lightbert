@@ -3,9 +3,50 @@ from albertlib import albert_model
 from albertlib.albert import AlbertConfig
 from dataset import make_pretrain_dataset
 from albertlib.optimization import LAMB, AdamWeightDecay, WarmUp
-from absl import flags
+from absl import flags, app
 import os
 import json
+
+FLAGS = flags.FLAGS
+
+flags.DEFINE_string(
+    "albert_config_file", None,
+    "The config json file corresponding to the pre-trained ALBERT model. "
+    "This specifies the model architecture.")
+flags.DEFINE_string(
+    "input_files", None,
+    "Input TF example files (can be a glob or comma separated).")
+flags.DEFINE_string("meta_data_file_path", None,
+                    "The path in which input meta data will be written.")
+flags.DEFINE_string(
+    "output_dir", None,
+    "The output directory where the model checkpoints will be written.")
+## Other parameters
+flags.DEFINE_string(
+    "init_checkpoint", None,
+    "Initial checkpoint (usually from a pre-trained ALBERT model).")
+flags.DEFINE_integer(
+    "max_seq_length", 512,
+    "The maximum total input sequence length after WordPiece tokenization. "
+    "Sequences longer than this will be truncated, and sequences shorter "
+    "than this will be padded. Must match data generation.")
+flags.DEFINE_integer(
+    "max_predictions_per_seq", 20,
+    "Maximum number of masked LM predictions per sequence. "
+    "Must match data generation.")
+flags.DEFINE_bool("do_train", True, "Whether to run training.")
+flags.DEFINE_bool("do_eval", False, "Whether to run eval on the dev set.")
+flags.DEFINE_integer("train_batch_size", 128, "Total batch size for training.")
+flags.DEFINE_integer("eval_batch_size", 64, "Total batch size for eval.")
+flags.DEFINE_enum("optimizer", "lamb", ["adamw", "lamb"],
+                  "The optimizer for training.")
+flags.DEFINE_float("learning_rate", 0.00176, "The initial learning rate.")
+flags.DEFINE_integer("num_train_epochs", 1, "Number of training epochs.")
+flags.DEFINE_float("warmup_proportion", 0.1, "Number of warmup steps.")
+flags.DEFINE_float("weight_decay", 0.01, "weight_decay")
+flags.DEFINE_float("adam_epsilon", 1e-6, "adam_epsilon")
+flags.DEFINE_integer("save_per_step", 5000, "save checkpoint per step")
+
 
 def print_attributes(inputs, lm_output):
     im_ids = inputs['masked_lm_ids']
@@ -14,6 +55,7 @@ def print_attributes(inputs, lm_output):
     lm_output = tf.argmax(lm_output, -1)
     print(im_ids)
     print(lm_output)
+
 
 class PretrainSolver():
 
@@ -32,6 +74,7 @@ class PretrainSolver():
         self.train_acc_metric = tf.keras.metrics.Accuracy()
         self.val_acc_metric = tf.keras.metrics.Accuracy()
         self.total_loss = tf.keras.metrics.Mean()
+        self.save_per_step = optimizer_config['save_per_step']
         self.save_per_epoch = 1
         self.train_metrics = []
         self.eval_metrics = []
@@ -72,11 +115,12 @@ class PretrainSolver():
 
     def train_and_eval(self, dataset: tf.data.Dataset, testSet: tf.data.Dataset = None):
 
+        self.load_check_points()
         num_train_step = 0
         for i in range(self.epoch):
 
             for step, (x_batch, y_true) in enumerate(dataset):
-                x_batch, lm_output = self.train_on_batch(x_batch, y_true)
+                self.train_on_batch(x_batch, y_true)
                 self.write_summery(num_train_step)
                 num_train_step += 1
 
@@ -84,7 +128,7 @@ class PretrainSolver():
                     training_status = self.get_train_metrics(num_train_step)
                     print(training_status)
 
-                if num_train_step % 5000 == 0:
+                if num_train_step % self.save_per_step == 0:
                     self.save_check_points(f'ctl_step_{num_train_step}.ckpt')
 
             if i % self.save_per_epoch == 0:
@@ -143,6 +187,14 @@ class PretrainSolver():
         saved_path = checkpoint.save(checkpoint_path)
         print('Saving model as TF checkpoint: %s', saved_path)
 
+    def load_check_points(self):
+        checkpoint = tf.train.Checkpoint(model=self.model, optimizer=self.optimizer)
+        latest_checkpoint_file = tf.train.latest_checkpoint(self.model_dir)
+        if latest_checkpoint_file:
+            print('found lastest checkpoint', latest_checkpoint_file)
+            checkpoint.restore(latest_checkpoint_file).expect_partial()
+            print('Loading from checkpoint file completed')
+
     def write_summery(self, current_step):
         with self.train_summary_writer.as_default():
             tf.summary.scalar(
@@ -153,63 +205,10 @@ class PretrainSolver():
             self.train_summary_writer.flush()
 
 
-def get_train_config():
-    ## Required parameters
-    flags.DEFINE_string(
-        "albert_config_file", None,
-        "The config json file corresponding to the pre-trained ALBERT model. "
-        "This specifies the model architecture.")
-    flags.DEFINE_string(
-        "input_files", None,
-        "Input TF example files (can be a glob or comma separated).")
-    flags.DEFINE_string("meta_data_file_path", None,
-                        "The path in which input meta data will be written.")
-    flags.DEFINE_string(
-        "output_dir", None,
-        "The output directory where the model checkpoints will be written.")
-    ## Other parameters
-    flags.DEFINE_string(
-        "init_checkpoint", None,
-        "Initial checkpoint (usually from a pre-trained ALBERT model).")
-    flags.DEFINE_integer(
-        "max_seq_length", 512,
-        "The maximum total input sequence length after WordPiece tokenization. "
-        "Sequences longer than this will be truncated, and sequences shorter "
-        "than this will be padded. Must match data generation.")
-    flags.DEFINE_integer(
-        "max_predictions_per_seq", 20,
-        "Maximum number of masked LM predictions per sequence. "
-        "Must match data generation.")
-    flags.DEFINE_bool("do_train", True, "Whether to run training.")
-    flags.DEFINE_bool("do_eval", False, "Whether to run eval on the dev set.")
-    flags.DEFINE_integer("train_batch_size", 128, "Total batch size for training.")
-    flags.DEFINE_integer("eval_batch_size", 64, "Total batch size for eval.")
-    flags.DEFINE_enum("optimizer", "lamb", ["adamw", "lamb"],
-                      "The optimizer for training.")
-    flags.DEFINE_float("learning_rate", 0.00176, "The initial learning rate.")
-    flags.DEFINE_integer("num_train_epochs", 1, "Number of training epochs.")
-    flags.DEFINE_float("warmup_proportion", 0.1, "Number of warmup steps.")
-    flags.DEFINE_float("weight_decay", 0.01, "weight_decay")
-    flags.DEFINE_float("adam_epsilon", 1e-6, "adam_epsilon")
+def run_albert_pretrain(train_config):
 
-    flags.mark_flag_as_required("input_files")
-    flags.mark_flag_as_required("albert_config_file")
-    flags.mark_flag_as_required("output_dir")
-
-    FLAGS = flags.FLAGS
-    FLAGS.mark_as_parsed()
-    return FLAGS.flag_values_dict()
-
-
-def run_albert_pretrain():
-    train_config = get_train_config()
-    train_config['batch_size'] = 128
-    train_config['num_train_epochs'] = 300
-    train_config['output_dir'] = 'pretrained_model'
-    train_config['initial_lr'] = train_config['learning_rate']
-
-    data_path = 'processed_data/train.tf_record'
-    with open('processed_data/train_meta_data','r') as meta_data:
+    data_path = train_config['input_files']
+    with open(train_config['meta_data_file_path'], 'r') as meta_data:
         train_meta_data = json.load(meta_data)
 
     max_seq_length = train_meta_data['max_seq_length']
@@ -219,7 +218,7 @@ def run_albert_pretrain():
     pretrain_model, core_model = albert_model.pretrain_model(
         albert_config, max_seq_length, max_predictions_per_seq)
 
-    batch_size = train_config['batch_size']
+    batch_size = train_config['train_batch_size']
     dataset = make_pretrain_dataset(data_path,
                             max_seq_length,
                             max_predictions_per_seq,
@@ -242,5 +241,10 @@ def run_albert_pretrain():
 
     solver.train_and_eval(dataset)
 
+
+def main(_):
+    train_config = FLAGS.flag_values_dict()
+    run_albert_pretrain(train_config)
+
 if __name__ =='__main__':
-    run_albert_pretrain()
+    app.run(main)

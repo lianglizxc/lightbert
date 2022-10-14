@@ -2,7 +2,7 @@
   "attention_probs_dropout_prob": 0,
   "hidden_act": "gelu",
   "hidden_dropout_prob": 0,
-  "embedding_size": 200,
+  "embedding_size": 100,
   "hidden_size": 60,
   "initializer_range": 0.02,
   "intermediate_size": 128,
