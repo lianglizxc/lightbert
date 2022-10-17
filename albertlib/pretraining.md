@@ -92,7 +92,7 @@ export PRETRAINED_MODEL=pretrained_model
 mkdir $PRETRAINED_MODEL
 export MODEL_DIR=base
 export PROCESSED_DATA=processed_data
-python.exe pretrain.py --albert_config_file=${MODEL_DIR}/config.json --do_train --init_checkpoint=${MODEL_DIR}/tf2_model_full.h5 --input_files=${PROCESSED_DATA}/train.tf_record --meta_data_file_path=${PROCESSED_DATA}/train_meta_data --output_dir=${PRETRAINED_MODEL} --strategy_type=one --train_batch_size=128 --num_train_epochs=3
+python.exe run_pretraining.py --albert_config_file=${MODEL_DIR}/config.json --do_train --init_checkpoint=${MODEL_DIR}/tf2_model_full.h5 --input_files=${PROCESSED_DATA}/train.tf_record --meta_data_file_path=${PROCESSED_DATA}/train_meta_data --output_dir=${PRETRAINED_MODEL} --strategy_type=one --train_batch_size=128 --num_train_epochs=3
 ```
 `num_train_steps = int(total_train_examples / train_batch_size) * num_train_epochs`
 

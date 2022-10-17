@@ -110,6 +110,19 @@ class JiebaTokenizer():
         return self.id_to_vocab
 
 
+def read_vocab_count(count_path, max_number):
+    vocab_count = {}
+    location = 0
+    with open(count_path, 'r') as file:
+        for line in file:
+            word, _ = line.strip().split('->')
+            vocab_count[word] = location
+            location += 1
+            if len(vocab_count) == max_number:
+                break
+    return vocab_count
+
+
 def convert_by_vocab(vocab, items):
   output = []
   for item in items:

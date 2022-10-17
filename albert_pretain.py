@@ -70,7 +70,10 @@ class PretrainSolver():
         self.model_dir = output_dir
         self.loss = tf.keras.losses.CategoricalCrossentropy(from_logits=True)
         self.total_step = int(steps_per_epoch * epoch)
-        self.optimizer = self.get_optimizer(optimizer_config, self.total_step)
+        #self.optimizer = self.get_optimizer(optimizer_config, self.total_step)
+        initial_lr = optimizer_config['learning_rate']
+        adam_epsilon = optimizer_config['adam_epsilon']
+        self.optimizer = tf.keras.optimizers.Adam(learning_rate = initial_lr, epsilon = adam_epsilon)
         self.train_acc_metric = tf.keras.metrics.Accuracy()
         self.val_acc_metric = tf.keras.metrics.Accuracy()
         self.total_loss = tf.keras.metrics.Mean()
@@ -112,7 +115,6 @@ class PretrainSolver():
             exclude_from_weight_decay=['layer_norm', 'bias'])
         return optimizer
 
-
     def train_and_eval(self, dataset: tf.data.Dataset, testSet: tf.data.Dataset = None):
 
         self.load_check_points()
@@ -120,16 +122,19 @@ class PretrainSolver():
         for i in range(self.epoch):
 
             for step, (x_batch, y_true) in enumerate(dataset):
-                self.train_on_batch(x_batch, y_true)
+                _, grads = self.train_on_batch(x_batch, y_true)
                 self.write_summery(num_train_step)
                 num_train_step += 1
 
                 if num_train_step % 100 == 0:
-                    training_status = self.get_train_metrics(num_train_step)
+                    training_status = self.get_train_metrics(f"Train step: {num_train_step}/{self.total_step}")
                     print(training_status)
 
                 if num_train_step % self.save_per_step == 0:
                     self.save_check_points(f'ctl_step_{num_train_step}.ckpt')
+
+            training_status = self.get_train_metrics(f"Train epoch: {i}/{self.epoch}")
+            print(training_status)
 
             if i % self.save_per_epoch == 0:
                 self.save_check_points(f'ctl_epoch_{i}.ckpt')
@@ -151,7 +156,7 @@ class PretrainSolver():
         self.total_loss.update_state(loss)
         for metric in self.train_metrics:
             metric.update_state(labels, model_outputs)
-        return x_batch, lm_output
+        return x_batch, grads
 
     def eval(self, testSet: tf.data.Dataset):
         y_true_array = []
@@ -168,9 +173,9 @@ class PretrainSolver():
                                          tf.reshape(tf.argmax(prob, axis=-1), shape=(-1, 1)))
         return prob
 
-    def get_train_metrics(self, epoch):
+    def get_train_metrics(self, msg):
         train_loss = self.total_loss.result().numpy()
-        training_status = 'Train step: %d/%d  / loss = %s' % (epoch, self.total_step, train_loss)
+        training_status = '%s  / loss = %s' % (msg, train_loss)
         for metric in self.train_metrics + self.model.metrics:
             metric_value = metric.result().numpy()
             training_status += '  %s = %f' % (metric.name, metric_value)
@@ -183,8 +188,10 @@ class PretrainSolver():
 
     def save_check_points(self, checkpoint_prefix):
         checkpoint = tf.train.Checkpoint(model=self.model, optimizer=self.optimizer)
-        checkpoint_path = os.path.join(self.model_dir, checkpoint_prefix)
-        saved_path = checkpoint.save(checkpoint_path)
+        manager = tf.train.CheckpointManager(
+            checkpoint, directory=self.model_dir,
+            checkpoint_name=checkpoint_prefix, max_to_keep=5)
+        saved_path = manager.save()
         print('Saving model as TF checkpoint: %s', saved_path)
 
     def load_check_points(self):
@@ -230,6 +237,7 @@ def run_albert_pretrain(train_config):
     epoch = train_config['num_train_epochs']
     len_train_examples = train_meta_data['train_data_size']
     steps_per_epoch = int(len_train_examples / batch_size)
+    print('steps_per_epoch is', steps_per_epoch)
     num_train_steps = int(len_train_examples / (batch_size * epoch))
     train_config['num_warmup_steps'] = int(num_train_steps * train_config['warmup_proportion'])
 

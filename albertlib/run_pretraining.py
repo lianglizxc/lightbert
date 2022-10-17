@@ -18,7 +18,8 @@
 
 from __future__ import absolute_import, division, print_function
 import sys
-sys.path.append('G:\pythonProject\lightbert')
+import os
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 import functools
 import json
 

@@ -33,12 +33,11 @@ def get_pretrain_finance_data():
     FLAGS.masked_lm_prob = 0.15
     FLAGS.output_file = 'processed_data/train.tf_record'
     FLAGS.ngram = 1
-    FLAGS.dupe_factor = 50
+    FLAGS.dupe_factor = 1
     FLAGS.mark_as_parsed()
 
     stop_words = finance_token.read_stop_words()
     tokenizer = finance_token.JiebaTokenizer(stop_words, [punctuation, punctuation_zh], vocab = 'finance_data/vocab')
-    tokenizer.truncate_vocab('finance_data/vocab_count')
 
     input_files = []
     for input_pattern in FLAGS.input_file.split(","):
