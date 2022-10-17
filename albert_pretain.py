@@ -71,9 +71,10 @@ class PretrainSolver():
         self.loss = tf.keras.losses.CategoricalCrossentropy(from_logits=True)
         self.total_step = int(steps_per_epoch * epoch)
         #self.optimizer = self.get_optimizer(optimizer_config, self.total_step)
-        initial_lr = optimizer_config['learning_rate']
-        adam_epsilon = optimizer_config['adam_epsilon']
-        self.optimizer = tf.keras.optimizers.Adam(learning_rate = initial_lr, epsilon = adam_epsilon)
+        # initial_lr = optimizer_config['learning_rate']
+        # adam_epsilon = optimizer_config['adam_epsilon']
+        # self.optimizer = tf.keras.optimizers.Adam(learning_rate=initial_lr, epsilon = adam_epsilon)
+        self.optimizer = tf.keras.optimizers.SGD()
         self.train_acc_metric = tf.keras.metrics.Accuracy()
         self.val_acc_metric = tf.keras.metrics.Accuracy()
         self.total_loss = tf.keras.metrics.Mean()
@@ -103,8 +104,14 @@ class PretrainSolver():
 
         if optimizer == "lamp":
             optimizer_fn = LAMB
-        else:
+        elif optimizer == 'adamdecay':
             optimizer_fn = AdamWeightDecay
+        elif optimizer == 'sgd':
+            optimizer_fn = tf.keras.optimizers.SGD
+        elif optimizer == 'adam':
+            optimizer_fn = tf.keras.optimizers.Adam
+        else:
+            raise Exception('not implemented optimizer')
 
         optimizer = optimizer_fn(
             learning_rate=learning_rate_fn,
@@ -191,7 +198,7 @@ class PretrainSolver():
             checkpoint, directory=self.model_dir,
             checkpoint_name=checkpoint_prefix, max_to_keep=5)
         saved_path = manager.save()
-        print('Saving model as TF checkpoint: %s', saved_path)
+        print(f'Saving model as TF checkpoint: {saved_path}')
 
     def load_check_points(self):
         checkpoint = tf.train.Checkpoint(model=self.model, optimizer=self.optimizer)
