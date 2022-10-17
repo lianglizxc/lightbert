@@ -1,6 +1,6 @@
 import tensorflow as tf
-from albertlib import albert_model
-from albertlib.albert import AlbertConfig
+from hf_albert import get_pretrain_model
+from transformers import AlbertConfig
 from dataset import make_pretrain_dataset
 from albertlib.optimization import LAMB, AdamWeightDecay, WarmUp
 from absl import flags, app
@@ -222,7 +222,7 @@ def run_albert_pretrain(train_config):
     max_predictions_per_seq = train_meta_data['max_predictions_per_seq']
 
     albert_config = AlbertConfig.from_json_file('config.json')
-    pretrain_model, core_model = albert_model.pretrain_model(
+    pretrain_model, core_model = get_pretrain_model(
         albert_config, max_seq_length, max_predictions_per_seq)
 
     batch_size = train_config['train_batch_size']

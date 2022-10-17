@@ -67,9 +67,9 @@ def make_pretrain_dataset(input_patterns,
   def _select_data_from_record(record):
     """Filter out features to use for pretraining."""
     x = {
-        'input_word_ids': record['input_ids'],
-        'input_mask': record['input_mask'],
-        'input_type_ids': record['segment_ids'],
+        'input_ids': record['input_ids'],
+        'attention_mask': record['input_mask'],
+        'token_type_ids': record['segment_ids'],
         'masked_lm_positions': record['masked_lm_positions'],
         'masked_lm_ids': record['masked_lm_ids'],
         'masked_lm_weights': record['masked_lm_weights'],
