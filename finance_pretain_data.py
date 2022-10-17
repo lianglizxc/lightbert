@@ -12,15 +12,16 @@ def save_corpus_vocab():
     stop_words = finance_token.read_stop_words()
     tokenizer = finance_token.JiebaTokenizer(stop_words, [punctuation, punctuation_zh])
 
-    with open('finance_data/data.txt','r') as file:
+    with open('finance_data/data.txt','r', encoding='UTF-8') as file:
         for line in file:
             line = line.strip()
             if len(line) == 0:
                 continue
             tokenizer.update_vocab(line)
 
-    tokenizer.save_vocab('finance_data/vocab')
     tokenizer.save_count('finance_data/vocab_count')
+    tokenizer.truncate_vocab('finance_data/vocab',50000)
+    tokenizer.save_vocab('finance_data/vocab')
 
 
 def get_pretrain_finance_data():

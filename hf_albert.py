@@ -116,6 +116,7 @@ class ALBertPretrainLossAndMetricLayer(tf.keras.layers.Layer):
     lm_label_weights = tf.cast(inputs[3], tf.float32)
     #lm_label_weights = tf.reshape(lm_label_weights, [-1])
     lm_per_example_loss = -tf.reduce_sum(lm_output * lm_label_ids_one_hot, axis=[-1])
+    lm_per_example_loss = tf.where(lm_label_weights > 0, lm_per_example_loss, tf.stop_gradient(lm_per_example_loss))
     numerator = tf.reduce_sum(lm_label_weights * lm_per_example_loss)
     denominator = tf.reduce_sum(lm_label_weights) + 1e-5
     mask_label_loss = numerator / denominator

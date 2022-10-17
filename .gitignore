@@ -3,5 +3,6 @@ __pycache__/
 processed_data
 finance_data
 .ipynb_checkpoints
+pretrained_model
 exclude
 base

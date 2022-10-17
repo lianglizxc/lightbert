@@ -53,7 +53,8 @@ class JiebaTokenizer():
             return None
         if token in self.punctuation:
             return None
-        if token == ' ' or token == '\n' or token[0].isnumeric():
+        if token == ' ' or token == '\n' or \
+                token[0].isnumeric() or '__' in token:
             return None
         if len(token) == 1 and token[0].isalpha():
             return None
@@ -113,7 +114,7 @@ class JiebaTokenizer():
 def read_vocab_count(count_path, max_number):
     vocab_count = {}
     location = 0
-    with open(count_path, 'r') as file:
+    with open(count_path, 'r', encoding='UTF-8') as file:
         for line in file:
             word, _ = line.strip().split('->')
             vocab_count[word] = location

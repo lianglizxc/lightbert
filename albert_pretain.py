@@ -146,8 +146,7 @@ class PretrainSolver():
     @tf.function
     def train_on_batch(self, x_batch, labels):
         with tf.GradientTape() as tape:
-            model_outputs, lm_output = self.model(x_batch, training=True)
-            loss = tf.reduce_mean(model_outputs)
+            loss = self.model(x_batch, training=True)
         # Collects training variables.
         training_vars = self.model.trainable_variables
         grads = tape.gradient(loss, training_vars)
@@ -155,7 +154,7 @@ class PretrainSolver():
         # For reporting, the metric takes the mean of losses.
         self.total_loss.update_state(loss)
         for metric in self.train_metrics:
-            metric.update_state(labels, model_outputs)
+            metric.update_state(labels, loss)
         return x_batch, grads
 
     def eval(self, testSet: tf.data.Dataset):
