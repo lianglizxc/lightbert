@@ -118,7 +118,7 @@ class ALBertPretrainLossAndMetricLayer(tf.keras.layers.Layer):
     lm_per_example_loss = -tf.reduce_sum(lm_output * lm_label_ids_one_hot, axis=[-1])
     lm_per_example_loss = tf.where(lm_label_weights > 0, lm_per_example_loss, tf.stop_gradient(lm_per_example_loss))
     numerator = tf.reduce_sum(lm_label_weights * lm_per_example_loss)
-    denominator = tf.reduce_sum(lm_label_weights) + 1e-5
+    denominator = tf.reduce_sum(lm_label_weights)
     mask_label_loss = numerator / denominator
 
     sentence_labels = inputs[4]
@@ -187,10 +187,8 @@ def get_pretrain_model(albert_config, max_seq_length, max_predictions_per_seq):
     output = pretrain_model(input_word_ids, input_mask, input_type_ids)
 
     pretrainlayer = ALBertPretrainLayer(albert_config, pretrain_model.albert.embeddings)
-    pretain_input = [output['pooler_output'],
-                     output['last_hidden_state'],
-                     masked_lm_positions]
-    lm_output, sentence_output = pretrainlayer(pretain_input)
+    lm_output, sentence_output = pretrainlayer([output['pooler_output'], output['last_hidden_state'],
+                                                masked_lm_positions])
 
     pretrain_loss_layer = ALBertPretrainLossAndMetricLayer(albert_config)
     output_loss = pretrain_loss_layer([lm_output, sentence_output, masked_lm_ids,

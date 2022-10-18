@@ -71,10 +71,10 @@ class PretrainSolver():
         self.loss = tf.keras.losses.CategoricalCrossentropy(from_logits=True)
         self.total_step = int(steps_per_epoch * epoch)
         #self.optimizer = self.get_optimizer(optimizer_config, self.total_step)
-        # initial_lr = optimizer_config['learning_rate']
-        # adam_epsilon = optimizer_config['adam_epsilon']
-        # self.optimizer = tf.keras.optimizers.Adam(learning_rate=initial_lr, epsilon = adam_epsilon)
-        self.optimizer = tf.keras.optimizers.SGD()
+        initial_lr = optimizer_config['learning_rate']
+        adam_epsilon = optimizer_config['adam_epsilon']
+        self.optimizer = tf.keras.optimizers.Adam(learning_rate=initial_lr, epsilon = adam_epsilon)
+        #self.optimizer = tf.keras.optimizers.SGD(learning_rate=initial_lr)
         self.train_acc_metric = tf.keras.metrics.Accuracy()
         self.val_acc_metric = tf.keras.metrics.Accuracy()
         self.total_loss = tf.keras.metrics.Mean()

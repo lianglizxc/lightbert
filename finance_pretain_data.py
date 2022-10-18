@@ -29,9 +29,9 @@ def get_pretrain_finance_data():
     FLAGS = flags.FLAGS
     FLAGS.meta_data_file_path = 'processed_data/train_meta_data'
     FLAGS.input_file = 'finance_data/data.txt'
-    FLAGS.max_seq_length = 50
-    FLAGS.max_predictions_per_seq = 20
-    FLAGS.masked_lm_prob = 0.15
+    FLAGS.max_seq_length = 80
+    FLAGS.max_predictions_per_seq = 10
+    FLAGS.masked_lm_prob = 0.2
     FLAGS.output_file = 'processed_data/train.tf_record'
     FLAGS.ngram = 1
     FLAGS.dupe_factor = 1
@@ -64,5 +64,14 @@ def get_pretrain_finance_data():
     write_instance_to_example_files(instances, tokenizer, FLAGS.max_seq_length,
                                     FLAGS.max_predictions_per_seq, output_files)
 
+def train_spm_vocab():
+    import sentencepiece as spm
+    param = '--input=finance_data/data.txt'
+    param += ' --model_prefix=processed_data/m'
+    param += ' --vocab_size=50000'
+    param += ' '
+    spm.SentencePieceTrainer.train(param)
+
+
 if __name__ == '__main__':
-    get_pretrain_finance_data()
+    train_spm_vocab()
