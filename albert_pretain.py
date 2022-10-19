@@ -254,6 +254,7 @@ def run_albert_pretrain(train_config):
                      epoch=epoch)
 
     solver.train_and_eval(dataset)
+    core_model.save(os.path.join(output_dir, 'pretrained_albert'), save_format="tf")
 
 
 def main(_):

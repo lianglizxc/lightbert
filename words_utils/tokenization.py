@@ -72,7 +72,8 @@ class JiebaTokenizer():
             for w, id, in self.vocab.items():
                 file.write(w + '->' + str(id) + '\n')
 
-    def load_vocab(self, path):
+    @staticmethod
+    def load_vocab(path):
         vocab = collections.OrderedDict()
         with open(path, 'r',encoding='UTF-8') as file:
             for line in file:
