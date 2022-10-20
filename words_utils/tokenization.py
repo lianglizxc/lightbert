@@ -1,17 +1,19 @@
 import collections
 import jieba
+import re
 
 class JiebaTokenizer():
     def __init__(self, stop_words, punctuations, vocab=None):
         self.stop_words = stop_words
-        self.punctuation = set()
         self.init_vocab = {'<pad>': 0,
                           '<unk>': 1,
                           '[CLS]': 2,
                           '[SEP]': 3,
                           '[MASK]': 4}
+        self.punctuation_list = punctuations
+        self.punctuation = set()
         for punctuation in punctuations:
-            self.punctuation.update(set(punctuation))
+            self.punctuation.update(punctuation)
 
         if isinstance(vocab, str):
             self.vocab = self.load_vocab(vocab)
@@ -59,6 +61,13 @@ class JiebaTokenizer():
         if len(token) == 1 and token[0].isalpha():
             return None
         return token.lower()
+
+    def clean_text(self, content):
+        content = content.translate(str.maketrans('', '', self.punctuation_list))
+        content = re.sub('\xa0 ?|\u3000+', '', content)
+        content = re.sub(' ?\n+', '\n', content)
+        content = content.strip('\n')
+        return content
 
     def save_count(self, path):
         items = list(self.count.items())
