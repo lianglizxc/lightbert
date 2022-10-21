@@ -56,7 +56,7 @@ class JiebaTokenizer():
         if token in self.punctuation:
             return None
         if token == ' ' or token == '\n' or \
-                token[0].isnumeric() or '__' in token:
+                token[0].isnumeric() or token.startswith('__'):
             return None
         if len(token) == 1 and token[0].isalpha():
             return None
