@@ -1,4 +1,5 @@
 import collections
+from transformers import BasicTokenizer
 import jieba
 import re
 
@@ -41,9 +42,7 @@ class JiebaTokenizer():
         return tokens
 
     def update_vocab(self, text):
-        for token in jieba.cut(text, cut_all=False):
-            word = self.preprocess_token(token)
-            if word is None: continue
+        for word in self.tokenize(text):
             if word not in self.vocab:
                 self.vocab[word] = len(self.vocab)
             if word not in self.count:
@@ -62,7 +61,7 @@ class JiebaTokenizer():
             return None
         return token.lower()
 
-    def clean_text(self, content):
+    def _clean_text(self, content):
         content = content.translate(str.maketrans('', '', self.punctuation_list))
         content = re.sub('\xa0 ?|\u3000+', '', content)
         content = re.sub(' ?\n+', '\n', content)
@@ -119,6 +118,105 @@ class JiebaTokenizer():
     def make_id_vocab(self):
         self.id_to_vocab = {v: k for k, v in self.vocab.items()}
         return self.id_to_vocab
+
+
+class ChineseTokenizer(BasicTokenizer):
+
+    def __init__(self, stop_words = None, punctuations = None, add_vocab = None):
+        super().__init__()
+
+        self.stop_words = stop_words if stop_words else set()
+        self.punctuation_list = punctuations if punctuations else ''
+        self.punctuation = set()
+        for punctuation in self.punctuation_list :
+            self.punctuation.update(punctuation)
+
+        self.init_vocab = {'<pad>': 0,
+                          '<unk>': 1,
+                          '[CLS]': 2,
+                          '[SEP]': 3,
+                          '[MASK]': 4}
+        self.vocab = self.build_vocab(add_vocab)
+        self.count = {}
+
+    def build_vocab(self, add_vocab):
+        vocab = collections.OrderedDict(self.init_vocab)
+        if add_vocab is not None:
+            for word in add_vocab:
+                if word not in vocab:
+                    vocab[word] = len(vocab)
+        return vocab
+
+    def _clean_text(self, content):
+        content = super()._clean_text(content)
+        content = content.translate(str.maketrans('', '', self.punctuation_list))
+        content = re.sub('\xa0 ?|\u3000+', '', content)
+        content = re.sub(' ?\n+', '\n', content)
+        content = content.strip('\n')
+        return content
+
+    def preprocess_token(self, token):
+        if token in self.stop_words:
+            return None
+        if token in self.punctuation:
+            return None
+        if token == '\n' or token.startswith('__'):
+            return None
+        return token
+
+    def tokenize(self, text, never_split=None):
+        never_split = self.never_split.union(set(never_split)) if never_split else self.never_split
+        text = self._clean_text(text)
+
+        if self.tokenize_chinese_chars:
+            text = self._tokenize_chinese_chars(text)
+        orig_tokens = whitespace_tokenize(text)
+        split_tokens = []
+        for token in orig_tokens:
+            token = self.preprocess_token(token)
+            if token is None: continue
+
+            if token not in never_split:
+                if self.do_lower_case:
+                    token = token.lower()
+                if self.strip_accents:
+                    token = self._run_strip_accents(token)
+
+            split_tokens.extend(self._run_split_on_punc(token, never_split))
+
+        output_tokens = whitespace_tokenize(" ".join(split_tokens))
+        return output_tokens
+
+    def update_vocab(self, text):
+        for word in self.tokenize(text):
+            if word not in self.vocab:
+                self.vocab[word] = len(self.vocab)
+            if word not in self.count:
+                self.count[word] = 0
+            self.count[word] += 1
+
+
+def save_vocab(path, vocab):
+    with open(path, 'w', encoding='UTF-8') as file:
+        for w, id, in vocab.items():
+            file.write(w + '->' + str(id) + '\n')
+
+
+def save_count(path, count):
+    items = list(count.items())
+    items = sorted(items, key=lambda x: x[1], reverse=True)
+    with open(path, 'w', encoding='UTF-8') as file:
+        for w, count in items:
+            file.write(w + '->' + str(count) + '\n')
+
+
+def whitespace_tokenize(text):
+    """Runs basic whitespace cleaning and splitting on a piece of text."""
+    text = text.strip()
+    if not text:
+        return []
+    tokens = text.split()
+    return tokens
 
 
 def read_vocab_count(count_path, max_number):
