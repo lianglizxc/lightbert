@@ -122,7 +122,7 @@ class JiebaTokenizer():
 
 class ChineseTokenizer(BasicTokenizer):
 
-    def __init__(self, stop_words = None, punctuations = None, add_vocab = None):
+    def __init__(self, stop_words = None, punctuations = None, vocab = None):
         super().__init__()
 
         self.stop_words = stop_words if stop_words else set()
@@ -136,7 +136,11 @@ class ChineseTokenizer(BasicTokenizer):
                           '[CLS]': 2,
                           '[SEP]': 3,
                           '[MASK]': 4}
-        self.vocab = self.build_vocab(add_vocab)
+        self.vocab = None
+        if isinstance(vocab, str):
+            self.load_vocab(vocab)
+        else:
+            self.build_vocab(vocab)
         self.count = {}
 
     def build_vocab(self, add_vocab):
@@ -145,7 +149,16 @@ class ChineseTokenizer(BasicTokenizer):
             for word in add_vocab:
                 if word not in vocab:
                     vocab[word] = len(vocab)
-        return vocab
+        self.vocab = vocab
+
+    def load_vocab(self,file_path):
+        vocab = collections.OrderedDict(self.init_vocab)
+        with open(file_path, 'r') as file:
+            for line in file:
+                word, _ = line.strip().split('->')
+                if word not in vocab:
+                    vocab[word] = len(vocab)
+        self.vocab = vocab
 
     def _clean_text(self, content):
         content = super()._clean_text(content)
@@ -173,6 +186,7 @@ class ChineseTokenizer(BasicTokenizer):
         orig_tokens = whitespace_tokenize(text)
         split_tokens = []
         for token in orig_tokens:
+            if token not in self.vocab: continue
             token = self.preprocess_token(token)
             if token is None: continue
 

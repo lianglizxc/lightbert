@@ -1,7 +1,7 @@
 from zhon.hanzi import punctuation as punctuation_zh
 from string import punctuation
 from words_utils import tokenization as finance_token
-from albertlib.create_pretraining_data import create_training_instances, write_instance_to_example_files
+from dataprocess.bart_dataset import create_training_instances, write_tfrecord_from_instances
 from absl import logging, flags
 import glob
 import random
@@ -25,6 +25,7 @@ def save_corpus_vocab():
 
 
 def get_pretrain_finance_data():
+    from albertlib.create_pretraining_data import create_training_instances, write_instance_to_example_files
     logging.set_verbosity(logging.INFO)
     FLAGS = flags.FLAGS
     FLAGS.meta_data_file_path = 'processed_data/train_meta_data'
@@ -97,5 +98,22 @@ def get_embedding_tsv():
     pd.DataFrame(pd_word).to_csv('finance_data/word_label.tsv', sep='\t', index=False, header=False)
 
 
+def get_pretrain_bart_data():
+    tokenizer = finance_token.ChineseTokenizer(vocab='finance_data/ch_vocab_count')
+
+    max_seq_length = 320
+    masked_lm_prob = 0.15
+    max_masked_length = 50
+    output_files = ['processed_data/bart_tfrecord']
+    meta_data_path = 'processed_data/bart_meta_data'
+    all_instances = create_training_instances(['finance_data/data.txt'], tokenizer,
+                              max_seq_length, masked_lm_prob, max_masked_length)
+
+    for instance in all_instances:
+        instance.check_valid_seq(tokenizer.vocab)
+
+    write_tfrecord_from_instances(all_instances, output_files, max_seq_length, meta_data_path)
+
+
 if __name__ == '__main__':
-    get_embedding_tsv()
+    get_pretrain_bart_data()

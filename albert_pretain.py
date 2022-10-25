@@ -1,7 +1,7 @@
 import tensorflow as tf
-from hf_albert import get_pretrain_model
+from hf_albert_model import get_pretrain_model
 from transformers import AlbertConfig
-from dataset import make_pretrain_dataset
+from dataprocess.bert_dataset import make_pretrain_dataset
 from albertlib.optimization import LAMB, AdamWeightDecay, WarmUp
 from absl import flags, app
 import os
