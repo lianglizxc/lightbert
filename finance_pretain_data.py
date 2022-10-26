@@ -76,7 +76,6 @@ def train_spm_vocab():
 
 def get_embedding_tsv():
     import tensorflow as tf
-    import pandas as pd
     model = tf.keras.models.load_model('pretrained_model/pretrained_albert')
     model.summary()
     embeddings = None
@@ -86,16 +85,6 @@ def get_embedding_tsv():
 
     vocab_index = finance_token.JiebaTokenizer.load_vocab('finance_data/vocab')
     assert len(vocab_index) == len(embeddings)
-
-    pd_embeddings = []
-    for count, word_embed in enumerate(embeddings):
-        pd_embeddings.append(word_embed.tolist())
-    pd.DataFrame(pd_embeddings).to_csv('finance_data/embedding.tsv', sep='\t', index=False, header=False)
-
-    pd_word = []
-    for count, word in enumerate(vocab_index):
-        pd_word.append(word)
-    pd.DataFrame(pd_word).to_csv('finance_data/word_label.tsv', sep='\t', index=False, header=False)
 
 
 def get_pretrain_bart_data():
