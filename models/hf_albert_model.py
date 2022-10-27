@@ -1,7 +1,5 @@
-from transformers import AlbertConfig, TFAlbertModel
-from dataset import make_pretrain_dataset
+from transformers import TFAlbertModel
 import tensorflow as tf
-import json
 
 
 
@@ -135,25 +133,6 @@ class ALBertPretrainLossAndMetricLayer(tf.keras.layers.Layer):
     return loss
 
 
-def read_tf_record():
-    data_path = 'processed_data/train.tf_record'
-
-    with open('processed_data/train_meta_data','r') as meta_data:
-        train_config = json.load(meta_data)
-
-    max_seq_length = train_config['max_seq_length']
-    max_predictions_per_seq = train_config['max_predictions_per_seq']
-    batch_size = 32
-
-    dataset = make_pretrain_dataset(data_path,
-                            max_seq_length,
-                            max_predictions_per_seq,
-                            batch_size,
-                            is_training=True,
-                            input_pipeline_context=None)
-    return dataset
-
-
 def unpack_data(feature):
     feature['input_ids'] = feature['input_word_ids']
     feature['attention_mask'] = feature['input_mask']
@@ -205,21 +184,3 @@ def get_pretrain_model(albert_config, max_seq_length, max_predictions_per_seq):
           'next_sentence_labels': next_sentence_labels,
       },
       outputs=output_loss), pretrain_model
-
-def run_test():
-
-    with open('processed_data/train_meta_data', 'r') as meta_data:
-        train_config = json.load(meta_data)
-
-    max_seq_length = train_config['max_seq_length']
-    max_predictions_per_seq = train_config['max_predictions_per_seq']
-    albert_config = AlbertConfig.from_json_file('config.json')
-    pretrain_model, _ = get_pretrain_model(albert_config, max_seq_length, max_predictions_per_seq)
-
-    dataset = read_tf_record()
-    for x, y in dataset:
-        output = pretrain_model(x)
-        break
-
-if __name__ == '__main__':
-    run_test()

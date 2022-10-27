@@ -90,13 +90,12 @@ def get_embedding_tsv():
 def get_pretrain_bart_data():
     tokenizer = finance_token.ChineseTokenizer(vocab='finance_data/ch_vocab_count')
 
-    max_seq_length = 320
-    masked_lm_prob = 0.15
-    max_masked_length = 50
+    max_seq_length = 512
+    masked_lm_prob = 0.2
     output_files = ['processed_data/bart_tfrecord']
     meta_data_path = 'processed_data/bart_meta_data'
     all_instances = create_training_instances(['finance_data/data.txt'], tokenizer,
-                              max_seq_length, masked_lm_prob, max_masked_length)
+                              max_seq_length, masked_lm_prob)
 
     for instance in all_instances:
         instance.check_valid_seq(tokenizer.vocab)

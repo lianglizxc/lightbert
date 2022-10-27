@@ -12,8 +12,8 @@ def decode_record(record, name_to_features):
     if t.dtype == tf.int64:
       t = tf.cast(t, tf.int32)
     example[name] = t
-
   return example
+
 
 def make_pretrain_dataset(input_patterns,
                             seq_length,

@@ -4,6 +4,19 @@ import tensorflow as tf
 import json
 
 
+def decode_record(record, name_to_features):
+  """Decodes a record to a TensorFlow example."""
+  example = tf.io.parse_single_example(record, name_to_features)
+  # tf.Example only supports tf.int64, but the TPU only supports tf.int32.
+  # So cast all int64 to int32.
+  for name in list(example.keys()):
+    t = example[name]
+    if t.dtype == tf.int64:
+      t = tf.cast(t, tf.int32)
+    example[name] = t
+  return example
+
+
 class TrainingInstance():
 
     def __init__(self, noise_tokens, input_ids, decoder_input_ids, count_segments):
@@ -30,7 +43,7 @@ class TrainingInstance():
         return len(self.noise_tokens)
 
 
-def create_training_instances(input_files, tokenizer, max_seq_length, masked_lm_prob, max_masked_length):
+def create_training_instances(input_files, tokenizer, max_seq_length, masked_lm_prob):
 
     all_documents = [[]]
     for file_path in input_files:
@@ -62,7 +75,7 @@ def create_training_instances(input_files, tokenizer, max_seq_length, masked_lm_
                 count_segments += 1
             else:
                 current_chunk = truncate_input_tokens(current_chunk, max_seq_length)
-                noise_tokens= add_noise(current_chunk, masked_lm_prob, max_masked_length)
+                noise_tokens= add_noise(current_chunk, masked_lm_prob)
                 trainingInstance = create_instance_from_tokens(noise_tokens, current_chunk, vocab, max_seq_length, count_segments)
                 instances.append(trainingInstance)
 
@@ -72,7 +85,7 @@ def create_training_instances(input_files, tokenizer, max_seq_length, masked_lm_
 
         if count_segments > 0:
             current_chunk = truncate_input_tokens(current_chunk, max_seq_length)
-            noise_tokens = add_noise(current_chunk, masked_lm_prob, max_masked_length)
+            noise_tokens = add_noise(current_chunk, masked_lm_prob)
             trainingInstance = create_instance_from_tokens(noise_tokens, current_chunk, vocab, max_seq_length, count_segments)
             instances.append(trainingInstance)
 
@@ -112,9 +125,9 @@ def write_tfrecord_from_instances(all_instances, output_files, max_seq_length, m
 
         features = collections.OrderedDict()
         features["input_ids"] = create_int_feature(input_ids)
-        features["attenten_mask"] = create_int_feature(attenten_mask)
+        features["attention_mask"] = create_int_feature(attenten_mask)
         features["decoder_input_ids"] = create_int_feature(decoder_input_ids)
-        features["decoder_output_ids"] = create_int_feature(decoder_output_ids)
+        features["decoder_labels"] = create_int_feature(decoder_output_ids)
         features["decoder_input_mask"] = create_int_feature(decoder_input_mask)
 
         tf_example = tf.train.Example(features=tf.train.Features(feature=features))
@@ -174,9 +187,8 @@ def truncate_input_tokens(tokens, max_seq_length):
     return tokens
 
 
-def add_noise(current_chunk, masked_lm_prob, max_masked_length):
+def add_noise(current_chunk, masked_lm_prob):
     masking_length = max(int(len(current_chunk) * masked_lm_prob), 1)
-    masking_length = min(masking_length, max_masked_length)
     instance = text_infilling(current_chunk, masking_length)
     instance = sentence_permutration(instance)
     return instance
@@ -219,6 +231,7 @@ def sentence_permutration(ori_tokens):
     token += [segment_token]
     return token
 
+
 def create_int_feature(values):
   feature = tf.train.Feature(int64_list=tf.train.Int64List(value=list(values)))
   return feature
@@ -227,6 +240,76 @@ def create_int_feature(values):
 def create_float_feature(values):
   feature = tf.train.Feature(float_list=tf.train.FloatList(value=list(values)))
   return feature
+
+
+def make_pretrain_dataset(input_patterns,
+                            seq_length,
+                            batch_size,
+                            is_training=True,
+                            input_pipeline_context=None):
+  """Creates input dataset from (tf)records files for pretraining."""
+  name_to_features = {
+      'input_ids':
+          tf.io.FixedLenFeature([seq_length], tf.int64),
+      'attention_mask':
+          tf.io.FixedLenFeature([seq_length], tf.int64),
+      'decoder_input_ids':
+          tf.io.FixedLenFeature([seq_length], tf.int64),
+      'decoder_input_mask':
+          tf.io.FixedLenFeature([seq_length], tf.int64),
+      'decoder_labels':
+          tf.io.FixedLenFeature([seq_length], tf.int64)
+  }
+
+  dataset = tf.data.Dataset.list_files(input_patterns, shuffle=is_training)
+
+  if input_pipeline_context and input_pipeline_context.num_input_pipelines > 1:
+    dataset = dataset.shard(input_pipeline_context.num_input_pipelines,
+                            input_pipeline_context.input_pipeline_id)
+
+  # We set shuffle buffer to exactly match total number of
+  # training files to ensure that training data is well shuffled.
+  input_files = []
+  for input_pattern in input_patterns:
+    input_files.extend(tf.io.gfile.glob(input_pattern))
+  dataset = dataset.shuffle(len(input_files))
+
+  # In parallel, create tf record dataset for each train files.
+  # cycle_length = 8 means that up to 8 files will be read and deserialized in
+  # parallel. You may want to increase this number if you have a large number of
+  # CPU cores.
+  dataset = dataset.interleave(
+      tf.data.TFRecordDataset, cycle_length=8,
+      num_parallel_calls=tf.data.experimental.AUTOTUNE)
+
+  decode_fn = lambda record: decode_record(record, name_to_features)
+  dataset = dataset.map(
+      decode_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+
+  def _select_data_from_record(record):
+    """Filter out features to use for pretraining."""
+    x = {
+        'input_ids': record['input_ids'],
+        'attention_mask': record['attention_mask'],
+        'decoder_input_ids': record['decoder_input_ids'],
+        'decoder_input_mask': record['decoder_input_mask'],
+        'decoder_labels': record['decoder_labels']
+    }
+
+    y = record['decoder_labels']
+
+    return (x, y)
+
+  dataset = dataset.map(
+      _select_data_from_record,
+      num_parallel_calls=tf.data.experimental.AUTOTUNE)
+
+  if is_training:
+    dataset = dataset.shuffle(1000)
+
+  dataset = dataset.batch(batch_size, drop_remainder=True)
+  dataset = dataset.prefetch(1024)
+  return dataset
 
 
 if __name__ == '__main__':
