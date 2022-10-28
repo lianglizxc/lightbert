@@ -3,8 +3,10 @@ from string import punctuation
 from words_utils import tokenization as finance_token
 from dataprocess.bart_dataset import create_training_instances, write_tfrecord_from_instances
 from absl import logging, flags
+import argparse
 import glob
 import random
+
 
 
 def save_corpus_vocab():
@@ -88,13 +90,22 @@ def get_embedding_tsv():
 
 
 def get_pretrain_bart_data():
+    parser = argparse.ArgumentParser("This is function to generate pretrain data")
+    parser.add_argument("--max_seq_length", type=int, default=512)
+    parser.add_argument("--masked_lm_prob", type=float, default=0.3)
+    parser.add_argument("--output_files", type=str, default='processed_data/bart_tfrecord')
+    parser.add_argument("--meta_data_path", type=str, default='processed_data/bart_meta_data')
+    parser.add_argument("--input_files", type=str, default='finance_data/data.txt')
+    args = parser.parse_args()
+
     tokenizer = finance_token.ChineseTokenizer(vocab='finance_data/ch_vocab_count')
 
-    max_seq_length = 512
-    masked_lm_prob = 0.2
-    output_files = ['processed_data/bart_tfrecord']
-    meta_data_path = 'processed_data/bart_meta_data'
-    all_instances = create_training_instances(['finance_data/data.txt'], tokenizer,
+    max_seq_length = args.max_seq_length
+    masked_lm_prob = args.masked_lm_prob
+    output_files = args.output_files.split(',')
+    meta_data_path = args.meta_data_path
+    input_files=[file for file in glob.glob(args.input_files)]
+    all_instances = create_training_instances(input_files, tokenizer,
                               max_seq_length, masked_lm_prob)
 
     for instance in all_instances:
