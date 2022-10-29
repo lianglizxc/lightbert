@@ -1,6 +1,7 @@
 import numpy as np
 import collections
 import tensorflow as tf
+from dataprocess.utils import truncate_input_tokens, create_int_feature
 import json
 
 
@@ -179,14 +180,6 @@ def create_instance_from_tokens(noise_tokens, ori_tokens, vocab, max_seq_length,
     return TrainingInstance(noise_tokens, noise_tokens_ids, ori_tokens_ids, count_segments)
 
 
-def truncate_input_tokens(tokens, max_seq_length):
-    if len(tokens) > max_seq_length:
-        tokens = tokens[:max_seq_length-1]
-        tokens.append('[SEP]')
-    assert len(tokens) <= max_seq_length
-    return tokens
-
-
 def add_noise(current_chunk, masked_lm_prob):
     masking_length = max(int(len(current_chunk) * masked_lm_prob), 1)
     instance = text_infilling(current_chunk, masking_length)
@@ -230,16 +223,6 @@ def sentence_permutration(ori_tokens):
         token += [segment_token] + segment
     token += [segment_token]
     return token
-
-
-def create_int_feature(values):
-  feature = tf.train.Feature(int64_list=tf.train.Int64List(value=list(values)))
-  return feature
-
-
-def create_float_feature(values):
-  feature = tf.train.Feature(float_list=tf.train.FloatList(value=list(values)))
-  return feature
 
 
 def make_pretrain_dataset(input_patterns,

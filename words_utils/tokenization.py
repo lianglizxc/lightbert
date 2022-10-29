@@ -153,7 +153,7 @@ class ChineseTokenizer(BasicTokenizer):
 
     def load_vocab(self,file_path):
         vocab = collections.OrderedDict(self.init_vocab)
-        with open(file_path, 'r') as file:
+        with open(file_path, 'r', encoding='UTF-8') as file:
             for line in file:
                 word, _ = line.strip().split('->')
                 if word not in vocab:
@@ -177,7 +177,7 @@ class ChineseTokenizer(BasicTokenizer):
             return None
         return token
 
-    def tokenize(self, text, never_split=None):
+    def tokenize(self, text, never_split=None, in_vocab = True):
         never_split = self.never_split.union(set(never_split)) if never_split else self.never_split
         text = self._clean_text(text)
 
@@ -186,7 +186,8 @@ class ChineseTokenizer(BasicTokenizer):
         orig_tokens = whitespace_tokenize(text)
         split_tokens = []
         for token in orig_tokens:
-            if token not in self.vocab: continue
+            if in_vocab and token not in self.vocab:
+                continue
             token = self.preprocess_token(token)
             if token is None: continue
 
@@ -202,7 +203,7 @@ class ChineseTokenizer(BasicTokenizer):
         return output_tokens
 
     def update_vocab(self, text):
-        for word in self.tokenize(text):
+        for word in self.tokenize(text, in_vocab=False):
             if word not in self.vocab:
                 self.vocab[word] = len(self.vocab)
             if word not in self.count:
