@@ -128,7 +128,7 @@ class ChineseTokenizer(BasicTokenizer):
         self.stop_words = stop_words if stop_words else set()
         self.punctuation_list = punctuations if punctuations else ''
         self.punctuation = set()
-        for punctuation in self.punctuation_list :
+        for punctuation in self.punctuation_list:
             self.punctuation.update(punctuation)
 
         self.init_vocab = {'<pad>': 0,
@@ -160,12 +160,16 @@ class ChineseTokenizer(BasicTokenizer):
                     vocab[word] = len(vocab)
         self.vocab = vocab
 
-    def _clean_text(self, content):
-        content = super()._clean_text(content)
+    def remove_extra_char(self, content):
         content = content.translate(str.maketrans('', '', self.punctuation_list))
         content = re.sub('\xa0 ?|\u3000+', '', content)
         content = re.sub(' ?\n+', '\n', content)
         content = content.strip('\n')
+        return content
+
+    def _clean_text(self, content):
+        content = self.remove_extra_char(content)
+        content = super()._clean_text(content)
         return content
 
     def preprocess_token(self, token):
