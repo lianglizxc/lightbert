@@ -99,8 +99,8 @@ def get_fine_tune_data():
 
     max_encoder_length = 512
     max_decoder_length = 70
-    meta_data_path = 'processed_data/bart_finetine_meta_data'
-    output_files = ['processed_data/bart_finetine_tf_record']
+    meta_data_path = 'processed_data/bart_finetune_meta_data'
+    output_files = ['processed_data/bart_finetune_tf_record']
 
     data = []
     for index, row in finance_news.iterrows():
