@@ -48,7 +48,7 @@ class PretrainLossLayer(tf.keras.layers.Layer):
         denominator = tf.reduce_sum(decoder_input_mask)
         loss = numerator / denominator
         self._add_metrics(lm_per_example_loss, decoder_labels, decoder_logits, decoder_input_mask)
-        return loss
+        return loss, tf.argmax(decoder_logits, -1)
 
     def _add_metrics(self, lm_per_example_loss, decoder_labels, decoder_logits, decoder_input_mask):
         """Adds metrics."""
