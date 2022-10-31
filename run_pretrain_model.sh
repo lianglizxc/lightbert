@@ -1,13 +1,12 @@
 #! /bin/bash
 
+export CUDA_VISIBLE_DEVICES=1
 
 PRETRAINED_MODEL=pretrained_model
 if [[ ! -d $PRETRAINED_MODEL ]]; then
     mkdir $PRETRAINED_MODEL
 fi
 PROCESSED_DATA=processed_data
-
-export CUDA_VISIBLE_DEVICES=1
 
 #python3 -u albert_pretain.py \
 #--train_batch_size=128 \

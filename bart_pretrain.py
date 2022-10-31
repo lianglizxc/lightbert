@@ -118,6 +118,7 @@ def run_bart_pretrain():
                      train_config,
                      epoch=epoch)
     sovler.train_and_eval(dataset)
+    core_model.save_weights(output_dir + '/weights.h5', save_format='h5')
 
 
 if __name__ == '__main__':

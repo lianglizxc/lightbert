@@ -19,7 +19,8 @@ class Solver():
         self.optimizer = tf.keras.optimizers.Adam(learning_rate=initial_lr, epsilon = adam_epsilon)
         self.train_acc_metric = tf.keras.metrics.Accuracy()
         self.val_acc_metric = tf.keras.metrics.Accuracy()
-        self.total_loss = tf.keras.metrics.Mean()
+        self.total_loss = tf.keras.metrics.Mean(name='train_loss')
+        self.eval_loss = tf.keras.metrics.Mean(name='eval_loss')
         self.save_per_step = optimizer_config['save_per_step']
         self.save_per_epoch = 1
         self.train_metrics = []
@@ -49,10 +50,10 @@ class Solver():
             training_status = self.get_train_metrics(f"Train epoch: {i}/{self.epoch}")
             print(training_status)
 
-            if i % self.save_per_epoch == 0:
-                self.save_check_points(f'ctl_epoch_{i}.ckpt')
             if testSet:
                 self.eval(testSet)
+            if i % self.save_per_epoch == 0:
+                self.save_check_points(f'ctl_epoch_{i}.ckpt')
 
             self.reset_metris()
 
@@ -72,29 +73,36 @@ class Solver():
 
     @tf.function
     def eval_on_batch(self, x_eval, y_eval):
-        prob = self.model(x_eval, training=False)
-        self.val_acc_metric.update_state(tf.reshape(tf.argmax(y_eval, axis=-1), shape=(-1, 1)),
-                                         tf.reshape(tf.argmax(prob, axis=-1), shape=(-1, 1)))
-        return prob
+        loss = self.model(x_eval, training=False)
+        for metric in self.eval_metrics:
+            metric.update_state(y_eval, loss)
+        return loss
 
     def eval(self, testSet: tf.data.Dataset):
-        y_true_array = []
-        y_pre_array = []
         for x_eval, y_eval in testSet:
-            prob = self.eval_on_batch(x_eval, y_eval)
-            y_true_array.append(tf.argmax(y_eval, -1).numpy())
-            y_pre_array.append(tf.argmax(prob, -1).numpy())
+            loss = self.eval_on_batch(x_eval, y_eval)
+            self.eval_loss.update_state(loss)
+
+        eval_loss = self.eval_loss.result().numpy()
+        eval_status = f'eval loss = {eval_loss}'
+        for metric in self.eval_metrics + self.model.metrics:
+            if 'eval' in metric.name:
+                metric_value = metric.result().numpy()
+                eval_status += '  %s = %f' % (metric.name, metric_value)
+        print(eval_status)
 
     def get_train_metrics(self, msg):
         train_loss = self.total_loss.result().numpy()
         training_status = '%s  / loss = %s' % (msg, train_loss)
         for metric in self.train_metrics + self.model.metrics:
-            metric_value = metric.result().numpy()
-            training_status += '  %s = %f' % (metric.name, metric_value)
+            if 'eval' not in metric.name:
+                metric_value = metric.result().numpy()
+                training_status += '  %s = %f' % (metric.name, metric_value)
         return training_status
 
     def reset_metris(self):
         self.total_loss.reset_state()
+        self.eval_loss.reset_state()
         for metric in self.train_metrics + self.eval_metrics + self.model.metrics:
             metric.reset_state()
 
