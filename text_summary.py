@@ -4,10 +4,52 @@ from words_utils.tokenization import ChineseTokenizer, read_stop_words
 import words_utils.tokenization as finance_tokenize
 from dataprocess.finetune_dataset import make_finetune_dataset
 from models.solver import Solver
+from rouge_score import rouge_scorer
 import tensorflow as tf
 import pandas as pd
 import argparse
 import json
+
+
+class SummarySolver(Solver):
+
+    def __init__(self, vocab, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        id_to_vocab = sorted(vocab.items(), key =lambda x: x[1])
+        self.id_to_vocab = [x for x, _ in id_to_vocab]
+
+        self.scorer = rouge_scorer.RougeScorer(['rougeL'])
+        self.eval_metrics = [tf.keras.metrics.Mean(name='eval_rogue')]
+
+    @tf.function
+    def eval_on_batch(self, x_eval, y_eval):
+        loss, pred = self.model(x_eval, training=False)
+        return loss, pred
+
+    def eval(self, testSet: tf.data.Dataset):
+
+        for x_eval, y_eval in testSet:
+            loss, pred = self.eval_on_batch(x_eval, y_eval)
+            self.eval_loss.update_state(loss)
+
+            pred = pred.numpy()
+            decoder_labels = x_eval['decoder_labels'].numpy()
+            decoder_mask = x_eval['decoder_input_mask'].numpy()
+            for label_per_row, pred_per_row, mask_per_row in zip(decoder_labels, pred, decoder_mask):
+
+                target = [self.id_to_vocab[word_id] for word_id in label_per_row[mask_per_row > 0]]
+                prediction = [self.id_to_vocab[word_id] for word_id in pred_per_row[mask_per_row > 0]]
+                scores = self.scorer.score(' '.join(target), ' '.join(prediction))
+                self.eval_metrics[0].update_state(scores['rougeL'][2])
+
+        eval_loss = self.eval_loss.result().numpy()
+        eval_status = f'eval loss = {eval_loss}'
+        for metric in self.eval_metrics + self.model.metrics:
+            if 'eval' in metric.name:
+                metric_value = metric.result().numpy()
+                eval_status += '  %s = %f' % (metric.name, metric_value)
+        print(eval_status)
 
 
 class PretrainLossLayer(tf.keras.layers.Layer):
@@ -35,7 +77,7 @@ class PretrainLossLayer(tf.keras.layers.Layer):
                                    decoder_logits, decoder_input_mask,
                                    name1='eval_masked_lm_accuracy',
                                    name2='eval_lm_example_loss')
-        return loss
+        return loss, tf.argmax(decoder_logits, -1)
 
     def _add_metrics(self, lm_per_example_loss, decoder_labels, decoder_logits, decoder_input_mask,
                      name1 = 'masked_lm_accuracy', name2 = 'lm_example_loss'):
@@ -133,6 +175,7 @@ def train_text_summary_model():
     group.add_argument("--warmup_steps", type=int)
     group.add_argument("--warmup_rate", type=float, default=0.06)
     group.add_argument("--train_batch_size", type=int, default=128, help="total training batch size of all devices")
+    group.add_argument("--eval_batch_size", type=int, default=64, help="total eval batch size of all devices")
     group.add_argument("--weight_decay", type=float, default=0.0, help="use weight decay")
     args = parser.parse_args()
 
@@ -142,20 +185,25 @@ def train_text_summary_model():
     full_datasize = meta_data['train_data_size']
     max_encoder_length = meta_data['max_encoder_length']
     max_decoder_length = meta_data['max_decoder_length']
-    batch_size = args.train_batch_size
+    train_batch_size = args.train_batch_size
+    eval_batch_size = args.eval_batch_size
     epoch = args.num_train_epochs
 
-    train_dataset, val_dataset = make_finetune_dataset(args.input_files, batch_size, max_encoder_length,
-                          max_decoder_length, args.train_test_split)
+    train_dataset, val_dataset = make_finetune_dataset(args.input_files, train_batch_size,
+                                                       eval_batch_size, max_encoder_length,
+                                                        max_decoder_length, args.train_test_split)
 
     train_data_size = int(full_datasize * (1 - args.train_test_split))
     print('train_data_size is', train_data_size)
-    steps_per_epoch = int(train_data_size / batch_size)
+    steps_per_epoch = int(train_data_size / train_batch_size)
     print('steps_per_epoch', steps_per_epoch)
     model = get_finetune_model('models/bart_config.json')
     train_configs = vars(args)
 
-    solver = Solver(model, steps_per_epoch, args.output_dir, train_configs, epoch)
+    tokenizer = ChineseTokenizer()
+    tokenizer.load_vocab('finance_data/ch_vocab_count')
+
+    solver = SummarySolver(tokenizer.vocab, model, steps_per_epoch, args.output_dir, train_configs, epoch)
     solver.train_and_eval(train_dataset, val_dataset)
 
 

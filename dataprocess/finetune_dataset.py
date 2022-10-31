@@ -2,7 +2,7 @@ import tensorflow as tf
 from dataprocess.utils import decode_record
 
 
-def make_finetune_dataset(input_patterns, batch_size, max_encoder_length, max_decoder_length, train_test_split=0.25):
+def make_finetune_dataset(input_patterns, train_batch_size, eval_batch_size, max_encoder_length, max_decoder_length, train_test_split=0.25):
 
     name_to_features = {
         'input_ids':
@@ -54,6 +54,6 @@ def make_finetune_dataset(input_patterns, batch_size, max_encoder_length, max_de
     val_dataset = full_dataset.enumerate().filter(lambda x,y: x % split_mod == 0) \
                     .map(lambda x,y: y)
 
-    train_dataset = train_dataset.shuffle(1000).batch(batch_size, drop_remainder=True).prefetch(1024)
-    val_dataset = val_dataset.batch(batch_size, drop_remainder=True)
+    train_dataset = train_dataset.shuffle(1000).batch(train_batch_size, drop_remainder=True).prefetch(1024)
+    val_dataset = val_dataset.batch(eval_batch_size, drop_remainder=True)
     return train_dataset, val_dataset

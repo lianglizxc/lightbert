@@ -17,8 +17,6 @@ class Solver():
         initial_lr = optimizer_config['learning_rate']
         adam_epsilon = optimizer_config['adam_epsilon']
         self.optimizer = tf.keras.optimizers.Adam(learning_rate=initial_lr, epsilon = adam_epsilon)
-        self.train_acc_metric = tf.keras.metrics.Accuracy()
-        self.val_acc_metric = tf.keras.metrics.Accuracy()
         self.total_loss = tf.keras.metrics.Mean(name='train_loss')
         self.eval_loss = tf.keras.metrics.Mean(name='eval_loss')
         self.save_per_step = optimizer_config['save_per_step']
@@ -36,7 +34,7 @@ class Solver():
         for i in range(self.epoch):
 
             for step, (x_batch, y_true) in enumerate(dataset):
-                _, grads = self.train_on_batch(x_batch, y_true)
+                _, pred = self.train_on_batch(x_batch, y_true)
                 self.write_summery(num_train_step)
                 num_train_step += 1
 
@@ -60,7 +58,7 @@ class Solver():
     @tf.function
     def train_on_batch(self, x_batch, labels):
         with tf.GradientTape() as tape:
-            loss = self.model(x_batch, training=True)
+            loss, pred= self.model(x_batch, training=True)
         # Collects training variables.
         training_vars = self.model.trainable_variables
         grads = tape.gradient(loss, training_vars)
@@ -69,14 +67,14 @@ class Solver():
         self.total_loss.update_state(loss)
         for metric in self.train_metrics:
             metric.update_state(labels, loss)
-        return x_batch, grads
+        return loss, pred
 
     @tf.function
     def eval_on_batch(self, x_eval, y_eval):
-        loss = self.model(x_eval, training=False)
+        loss, pred = self.model(x_eval, training=False)
         for metric in self.eval_metrics:
             metric.update_state(y_eval, loss)
-        return loss
+        return loss, pred
 
     def eval(self, testSet: tf.data.Dataset):
         for x_eval, y_eval in testSet:
