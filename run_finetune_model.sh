@@ -9,5 +9,6 @@ fi
 
 python3 text_summary.py --num_train_epochs=20 \
 --output_dir=$output_dir \
---train_batch_size=128 \
---save_per_step=3000
+--train_batch_size=64 \
+--save_per_step=3000 \
+--print_per_step=50

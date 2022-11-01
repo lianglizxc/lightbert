@@ -20,6 +20,7 @@ class Solver():
         self.total_loss = tf.keras.metrics.Mean(name='train_loss')
         self.eval_loss = tf.keras.metrics.Mean(name='eval_loss')
         self.save_per_step = optimizer_config['save_per_step']
+        self.print_per_step = optimizer_config['print_per_step']
         self.save_per_epoch = 1
         self.train_metrics = []
         self.eval_metrics = []
@@ -38,7 +39,7 @@ class Solver():
                 self.write_summery(num_train_step)
                 num_train_step += 1
 
-                if num_train_step % 100 == 0:
+                if num_train_step % self.print_per_step == 0:
                     training_status = self.get_train_metrics(f"Train step: {num_train_step}/{self.total_step}")
                     print(training_status)
 

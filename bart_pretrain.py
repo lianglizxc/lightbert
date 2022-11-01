@@ -15,6 +15,7 @@ group.add_argument("--meta_data_file_path", default="processed_data/bart_meta_da
 group = parser.add_argument_group("Training Parameters")
 group.add_argument("--adam_epsilon", type=float, default=1e-6, help="adam_epsilon")
 group.add_argument("--save_per_step", type=int, default=5000, help="save checkpoint per step")
+group.add_argument("--print_per_step", type=int, default=200, help="save checkpoint per step")
 group.add_argument("--num_train_epochs", type=int, default=10)
 group.add_argument("--learning_rate", type=float, default=2e-4)
 group.add_argument("--warmup_steps", type=int)

@@ -54,22 +54,25 @@ class SummarySolver(Solver):
 
 class PretrainLossLayer(tf.keras.layers.Layer):
 
-    def __init__(self, **kwargs):
+    def __init__(self, model_config, max_decoder_length, **kwargs):
         super().__init__(**kwargs)
         self.loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True,
                             reduction=tf.keras.losses.Reduction.NONE)
-        self.debug = None
+        self.vocab_size = model_config.vocab_size
+        self.max_decoder_length = max_decoder_length
 
     def call(self, inputs, *args, **kwargs):
         decoder_logits = inputs[0]
-        decoder_input_mask = tf.cast(inputs[1], tf.float32)
+        decoder_input_mask = inputs[1]
         decoder_labels = inputs[2]
+        decoder_input_mask = tf.cast(decoder_input_mask, tf.float32)
 
         lm_per_example_loss = self.loss_fn(decoder_labels, decoder_logits)
         lm_per_example_loss = tf.where(decoder_input_mask > 0, lm_per_example_loss, tf.stop_gradient(lm_per_example_loss))
         numerator = tf.reduce_sum(decoder_input_mask * lm_per_example_loss)
         denominator = tf.reduce_sum(decoder_input_mask)
         loss = numerator / denominator
+        loss = tf.reduce_mean(-lm_per_example_loss)
         if kwargs['training']:
             self._add_metrics(lm_per_example_loss, decoder_labels, decoder_logits, decoder_input_mask)
         else:
@@ -126,15 +129,15 @@ def save_vocab_count():
     finance_tokenize.save_count('finance_data/ch_vocab_count', tokenizer.count)
 
 
-def get_finetune_model(pretrain_config):
+def get_finetune_model(pretrain_config, max_encoder_length, max_decoder_length):
     model_config = BartConfig.from_json_file(pretrain_config)
     bart_model = TFBartForConditionalGeneration(model_config)
 
-    input_ids = tf.keras.Input([None], dtype=tf.int64, name='word_input_ids')
-    attention_mask = tf.keras.Input([None], dtype=tf.int64, name='attention_mask')
-    decoder_input_ids = tf.keras.Input([None], dtype=tf.int64, name='decoder_input_ids')
-    decoder_input_mask = tf.keras.Input([None], dtype=tf.int64, name='decoder_input_mask')
-    decoder_labels = tf.keras.Input([None], dtype=tf.int64, name='decoder_labels')
+    input_ids = tf.keras.Input([max_encoder_length], dtype=tf.int64, name='word_input_ids')
+    attention_mask = tf.keras.Input([max_encoder_length], dtype=tf.int64, name='attention_mask')
+    decoder_input_ids = tf.keras.Input([max_decoder_length], dtype=tf.int64, name='decoder_input_ids')
+    decoder_input_mask = tf.keras.Input([max_decoder_length], dtype=tf.int64, name='decoder_input_mask')
+    decoder_labels = tf.keras.Input([max_decoder_length], dtype=tf.int64, name='decoder_labels')
 
     dummy_input = {
                 "input_ids": input_ids,
@@ -145,7 +148,7 @@ def get_finetune_model(pretrain_config):
     bart_model.load_weights('pretrained_model/weights.h5')
 
     decoder_logits = output['logits']
-    pretrainlosslayer = PretrainLossLayer()
+    pretrainlosslayer = PretrainLossLayer(model_config,max_decoder_length)
     output_loss = pretrainlosslayer([decoder_logits, decoder_input_mask, decoder_labels])
 
     return tf.keras.Model(
@@ -169,7 +172,8 @@ def train_text_summary_model():
 
     group = parser.add_argument_group("Training Parameters")
     group.add_argument("--adam_epsilon", type=float, default=1e-6, help="adam_epsilon")
-    group.add_argument("--save_per_step", type=int, default=300, help="save checkpoint per step")
+    group.add_argument("--save_per_step", type=int, default=5000, help="save checkpoint per step")
+    group.add_argument("--print_per_step", type=int, default=200, help="print status per step")
     group.add_argument("--num_train_epochs", type=int, default=10)
     group.add_argument("--learning_rate", type=float, default=0.001)
     group.add_argument("--warmup_steps", type=int)
@@ -197,7 +201,7 @@ def train_text_summary_model():
     print('train_data_size is', train_data_size)
     steps_per_epoch = int(train_data_size / train_batch_size)
     print('steps_per_epoch', steps_per_epoch)
-    model = get_finetune_model('models/bart_config.json')
+    model = get_finetune_model('models/bart_config.json',max_encoder_length, max_decoder_length)
     train_configs = vars(args)
 
     tokenizer = ChineseTokenizer()
