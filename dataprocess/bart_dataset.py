@@ -83,6 +83,19 @@ def create_training_instances(input_files, tokenizer, max_seq_length, masked_lm_
     return all_instances
 
 
+def create_instance_from_pandas(finence_news, tokenizer, max_seq_length, masked_lm_prob):
+    all_instances = []
+    for title in finence_news:
+        tokens = tokenizer.tokenize(title)
+
+        tokens = ['[CLS]'] + tokens + ['[SEP]']
+        tokens = truncate_input_tokens(tokens, max_seq_length)
+        noise_tokens = add_noise(tokens, masked_lm_prob)
+        trainingInstance = create_instance_from_tokens(noise_tokens, tokens, tokenizer.vocab, max_seq_length,1)
+        all_instances.append(trainingInstance)
+    return all_instances
+
+
 def write_tfrecord_from_instances(all_instances, output_files, max_seq_length, meta_data_path):
     writers = []
     for output_file in output_files:

@@ -1,12 +1,11 @@
 from zhon.hanzi import punctuation as punctuation_zh
 from string import punctuation
 from words_utils import tokenization as finance_token
-from dataprocess.bart_dataset import create_training_instances, write_tfrecord_from_instances
+from dataprocess.bart_dataset import create_training_instances, write_tfrecord_from_instances, create_instance_from_pandas
 from absl import logging, flags
 import argparse
 import glob
 import random
-
 
 
 def save_corpus_vocab():
@@ -108,8 +107,13 @@ def get_pretrain_bart_data():
     all_instances = create_training_instances(input_files, tokenizer,
                               max_seq_length, masked_lm_prob)
 
-    for instance in all_instances:
-        instance.check_valid_seq(tokenizer.vocab)
+    import pandas as pd
+    finence_news = pd.read_excel('finance_data/SmoothNLP专栏资讯数据集样本10k.xlsx')
+    finence_news = finence_news['title']
+    finence_news = finence_news[~finence_news.isna()]
+
+    title_instances = create_instance_from_pandas(finence_news, tokenizer, max_seq_length, masked_lm_prob)
+    all_instances = all_instances + title_instances
 
     write_tfrecord_from_instances(all_instances, output_files, max_seq_length, meta_data_path)
 

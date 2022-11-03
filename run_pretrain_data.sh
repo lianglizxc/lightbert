@@ -15,7 +15,7 @@ fi
 #--max_predictions_per_seq=6
 
 python3 finance_pretain_data.py \
---masked_lm_prob=0.15 \
+--masked_lm_prob=0.3 \
 --max_seq_length=512 \
 --output_file=${PROCESSED_DATA}/bart_tfrecord \
 --meta_data_path=${PROCESSED_DATA}/bart_meta_data

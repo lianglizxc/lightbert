@@ -44,7 +44,7 @@ class PretrainLossLayer(tf.keras.layers.Layer):
         # decoder_logits = tf.nn.log_softmax(decoder_logits, axis=-1)
         # decoder_labels_one_hot = tf.one_hot(decoder_labels, self.config.vocab_size)
         # lm_per_example_loss = -tf.reduce_sum(decoder_logits * decoder_labels_one_hot, axis=[-1])
-        lm_per_example_loss = tf.where(decoder_input_mask > 0, lm_per_example_loss, tf.stop_gradient(lm_per_example_loss))
+        #lm_per_example_loss = tf.where(decoder_input_mask > 0, lm_per_example_loss, tf.stop_gradient(lm_per_example_loss))
         numerator = tf.reduce_sum(decoder_input_mask * lm_per_example_loss)
         denominator = tf.reduce_sum(decoder_input_mask)
         loss = numerator / denominator
@@ -75,6 +75,7 @@ def get_bart_pretrain(config, max_sequence_length):
                 "input_ids": input_ids,
                 "attention_mask": attention_mask,
                 "decoder_input_ids": decoder_input_ids,
+                "decoder_attention_mask":decoder_input_mask
             }
     output = bart_model(dummy_input)
 
