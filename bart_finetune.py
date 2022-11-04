@@ -68,11 +68,10 @@ class PretrainLossLayer(tf.keras.layers.Layer):
         decoder_input_mask = tf.cast(decoder_input_mask, tf.float32)
 
         lm_per_example_loss = self.loss_fn(decoder_labels, decoder_logits)
-        lm_per_example_loss = tf.where(decoder_input_mask > 0, lm_per_example_loss, tf.stop_gradient(lm_per_example_loss))
+        #lm_per_example_loss = tf.where(decoder_input_mask > 0, lm_per_example_loss, tf.stop_gradient(lm_per_example_loss))
         numerator = tf.reduce_sum(decoder_input_mask * lm_per_example_loss)
         denominator = tf.reduce_sum(decoder_input_mask)
         loss = numerator / denominator
-        loss = tf.reduce_mean(-lm_per_example_loss)
         if kwargs['training']:
             self._add_metrics(lm_per_example_loss, decoder_labels, decoder_logits, decoder_input_mask)
         else:
@@ -142,7 +141,8 @@ def get_finetune_model(pretrain_config, max_encoder_length, max_decoder_length):
     dummy_input = {
                 "input_ids": input_ids,
                 "attention_mask": attention_mask,
-                "decoder_input_ids": decoder_input_ids
+                "decoder_input_ids": decoder_input_ids,
+                "decoder_attention_mask":decoder_input_mask
             }
     output = bart_model(dummy_input)
     bart_model.load_weights('pretrained_model/weights.h5')

@@ -40,10 +40,6 @@ class PretrainLossLayer(tf.keras.layers.Layer):
         decoder_labels = inputs[2]
 
         lm_per_example_loss = self.loss_fn(decoder_labels, decoder_logits)
-
-        # decoder_logits = tf.nn.log_softmax(decoder_logits, axis=-1)
-        # decoder_labels_one_hot = tf.one_hot(decoder_labels, self.config.vocab_size)
-        # lm_per_example_loss = -tf.reduce_sum(decoder_logits * decoder_labels_one_hot, axis=[-1])
         #lm_per_example_loss = tf.where(decoder_input_mask > 0, lm_per_example_loss, tf.stop_gradient(lm_per_example_loss))
         numerator = tf.reduce_sum(decoder_input_mask * lm_per_example_loss)
         denominator = tf.reduce_sum(decoder_input_mask)
