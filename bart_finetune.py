@@ -159,7 +159,15 @@ def get_finetune_model(pretrain_config, max_encoder_length, max_decoder_length):
           'decoder_input_mask':decoder_input_mask,
           'decoder_labels':decoder_labels
       },
-      outputs=output_loss)
+      outputs=output_loss), bart_model
+
+
+def convert_batch_vocab(id_to_vocab, batch_ids):
+    text = []
+    for word_per_row in id_to_vocab[batch_ids]:
+        word_per_row = ''.join(word_per_row).split('[SEP]')[0]
+        text.append(word_per_row)
+    return text
 
 
 def train_text_summary_model():
@@ -169,6 +177,7 @@ def train_text_summary_model():
     group.add_argument("--output_dir", default="bart_finetune_model", help="output directory to save log and model checkpoints")
     group.add_argument("--meta_data_file_path", default="processed_data/bart_finetune_meta_data")
     group.add_argument("--train_test_split", default=0.25)
+    group.add_argument("--write_test_result", type=bool, default=False, help="produce prediction result")
 
     group = parser.add_argument_group("Training Parameters")
     group.add_argument("--adam_epsilon", type=float, default=1e-6, help="adam_epsilon")
@@ -201,7 +210,7 @@ def train_text_summary_model():
     print('train_data_size is', train_data_size)
     steps_per_epoch = int(train_data_size / train_batch_size)
     print('steps_per_epoch', steps_per_epoch)
-    model = get_finetune_model('models/bart_config.json',max_encoder_length, max_decoder_length)
+    model, core_model = get_finetune_model('models/bart_config.json',max_encoder_length, max_decoder_length)
     train_configs = vars(args)
 
     tokenizer = ChineseTokenizer()
@@ -209,6 +218,26 @@ def train_text_summary_model():
 
     solver = SummarySolver(tokenizer.vocab, model, steps_per_epoch, args.output_dir, train_configs, epoch)
     solver.train_and_eval(train_dataset, val_dataset)
+
+    core_model.save_weights(args.output_dir + '/weights.h5', save_format='h5')
+
+    if args.write_test_result:
+        result = []
+        import numpy as np
+        id_to_vocab = np.array(solver.id_to_vocab)
+        for x_batch, y in val_dataset:
+            input = {'input_ids':x_batch['input_ids'],
+                     'attention_mask':x_batch['attention_mask']}
+            output = core_model(input, training = False)
+            prediction = tf.argmax(output['logits'], -1)
+
+            prediction = convert_batch_vocab(id_to_vocab, prediction)
+            label = convert_batch_vocab(id_to_vocab, x_batch['decoder_labels'])
+
+            for summary, label_per_row in zip(prediction, label):
+                result.append([summary, label_per_row])
+        result = pd.DataFrame(result, columns=['prediction','target'])
+        result.to_excel('test_result.xlsx')
 
 
 if __name__ == '__main__':
