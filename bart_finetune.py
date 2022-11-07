@@ -6,6 +6,7 @@ from dataprocess.finetune_dataset import make_finetune_dataset
 from models.solver import Solver
 from rouge_score import rouge_scorer
 import tensorflow as tf
+import numpy as np
 import pandas as pd
 import argparse
 import json
@@ -13,34 +14,38 @@ import json
 
 class SummarySolver(Solver):
 
-    def __init__(self, vocab, *args, **kwargs):
+    def __init__(self, tokenizer, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        id_to_vocab = sorted(vocab.items(), key =lambda x: x[1])
-        self.id_to_vocab = [x for x, _ in id_to_vocab]
+        id_to_vocab = sorted(tokenizer.vocab.items(), key =lambda x: x[1])
+        self.id_to_vocab = np.array([x for x, _ in id_to_vocab])
 
-        self.scorer = rouge_scorer.RougeScorer(['rougeL'])
+        self.scorer = rouge_scorer.RougeScorer(['rougeL'], tokenizer=tokenizer)
         self.eval_metrics = [tf.keras.metrics.Mean(name='eval_rogue')]
 
     @tf.function
     def eval_on_batch(self, x_eval, y_eval):
-        loss, pred = self.model(x_eval, training=False)
+        input = {'input_ids': x_eval['input_ids'],
+                 'attention_mask': x_eval['attention_mask']}
+        loss, pred = self.model(input, training=False)
         return loss, pred
 
     def eval(self, testSet: tf.data.Dataset):
 
+        index = 0
         for x_eval, y_eval in testSet:
-            loss, pred = self.eval_on_batch(x_eval, y_eval)
+            loss, prediction = self.eval_on_batch(x_eval, y_eval)
             self.eval_loss.update_state(loss)
 
-            pred = pred.numpy()
-            decoder_labels = x_eval['decoder_labels'].numpy()
-            decoder_mask = x_eval['decoder_input_mask'].numpy()
-            for label_per_row, pred_per_row, mask_per_row in zip(decoder_labels, pred, decoder_mask):
+            prediction = prediction.numpy()
+            labels = x_eval['decoder_labels'].numpy()
 
-                target = [self.id_to_vocab[word_id] for word_id in label_per_row[mask_per_row > 0]]
-                prediction = [self.id_to_vocab[word_id] for word_id in pred_per_row[mask_per_row > 0]]
-                scores = self.scorer.score(' '.join(target), ' '.join(prediction))
+            labels = convert_batch_vocab(self.id_to_vocab, labels)
+            prediction = convert_batch_vocab(self.id_to_vocab, prediction)
+            for label_per_row, pred_per_row in zip(labels, prediction):
+                print(f"{index}: ", pred_per_row)
+                index += 1
+                scores = self.scorer.score(label_per_row, pred_per_row)
                 self.eval_metrics[0].update_state(scores['rougeL'][2])
 
         eval_loss = self.eval_loss.result().numpy()
@@ -128,7 +133,7 @@ def save_vocab_count():
     finance_tokenize.save_count('finance_data/ch_vocab_count', tokenizer.count)
 
 
-def get_finetune_model(pretrain_config, max_encoder_length, max_decoder_length):
+def get_finetune_model(pretrain_config, max_encoder_length, max_decoder_length, weight_path = 'pretrained_model/weights.h5'):
     model_config = BartConfig.from_json_file(pretrain_config)
     bart_model = TFBartForConditionalGeneration(model_config)
 
@@ -145,7 +150,7 @@ def get_finetune_model(pretrain_config, max_encoder_length, max_decoder_length):
                 "decoder_attention_mask":decoder_input_mask
             }
     output = bart_model(dummy_input)
-    bart_model.load_weights('pretrained_model/weights.h5')
+    bart_model.load_weights(weight_path)
 
     decoder_logits = output['logits']
     pretrainlosslayer = PretrainLossLayer(model_config,max_decoder_length)
@@ -216,15 +221,16 @@ def train_text_summary_model():
     tokenizer = ChineseTokenizer()
     tokenizer.load_vocab('finance_data/ch_vocab_count')
 
-    solver = SummarySolver(tokenizer.vocab, model, steps_per_epoch, args.output_dir, train_configs, epoch)
+    solver = SummarySolver(tokenizer, model, steps_per_epoch, args.output_dir, train_configs, epoch)
     solver.train_and_eval(train_dataset, val_dataset)
 
     core_model.save_weights(args.output_dir + '/weights.h5', save_format='h5')
 
     if args.write_test_result:
+        print("*****write_test_result*****")
         result = []
-        import numpy as np
         id_to_vocab = np.array(solver.id_to_vocab)
+        scorer = rouge_scorer.RougeScorer(['rougeL'], tokenizer=tokenizer)
         for x_batch, y in val_dataset:
             input = {'input_ids':x_batch['input_ids'],
                      'attention_mask':x_batch['attention_mask']}
@@ -235,8 +241,9 @@ def train_text_summary_model():
             label = convert_batch_vocab(id_to_vocab, x_batch['decoder_labels'])
 
             for summary, label_per_row in zip(prediction, label):
-                result.append([summary, label_per_row])
-        result = pd.DataFrame(result, columns=['prediction','target'])
+                scores = scorer.score(label_per_row, summary)
+                result.append([summary, label_per_row, scores['rougeL'][2]])
+        result = pd.DataFrame(result, columns=['prediction','target', 'rougeL'])
         result.to_excel('test_result.xlsx')
 
 

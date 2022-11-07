@@ -50,6 +50,7 @@ class Solver():
             print(training_status)
 
             if testSet:
+                print("****evaluation****")
                 self.eval(testSet)
             if i % self.save_per_epoch == 0:
                 self.save_check_points(f'ctl_epoch_{i}.ckpt')
@@ -102,6 +103,7 @@ class Solver():
     def reset_metris(self):
         self.total_loss.reset_state()
         self.eval_loss.reset_state()
+        print('eval metrics', self.eval_metrics)
         for metric in self.train_metrics + self.eval_metrics + self.model.metrics:
             metric.reset_state()
 
