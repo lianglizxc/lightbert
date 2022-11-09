@@ -24,5 +24,5 @@
     "pad_token_id": 0,
     "gradient_checkpointing": false,
     "scale_embedding": false,
-    "use_cache": false
+    "use_cache": true
 }

@@ -7,7 +7,7 @@ if [[ ! -d $output_dir ]]; then
     mkdir $output_dir
 fi
 
-python3 -u bart_finetune.py --num_train_epochs=2 \
+python3 -u bart_finetune.py --num_train_epochs=3 \
 --output_dir=$output_dir \
 --train_batch_size=64 \
 --save_per_step=3000 \

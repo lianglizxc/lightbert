@@ -103,7 +103,6 @@ class Solver():
     def reset_metris(self):
         self.total_loss.reset_state()
         self.eval_loss.reset_state()
-        print('eval metrics', self.eval_metrics)
         for metric in self.train_metrics + self.eval_metrics + self.model.metrics:
             metric.reset_state()
 
